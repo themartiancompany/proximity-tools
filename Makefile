@@ -21,6 +21,7 @@ install: install-scripts install-doc
 
 install-scripts:
 
+	install -vDm 755 "$(_PROJECT)/area-seed-get" "$(BIN_DIR)/area-seed-get"
 	install -vDm 755 "$(_PROJECT)/wifi-proximity-score" "$(BIN_DIR)/wifi-proximity-score"
 
 install-doc:

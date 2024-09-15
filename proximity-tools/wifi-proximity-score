@@ -48,14 +48,17 @@ _sight_get() {
 
 # Proximity score
 # $@: area seed (sha256sums of area bssids)
-_proximity_score() {
+_wifi_proximity_score() {
   local \
+    _scan_tool="${1}" \
     _pics=() \
     _bsss=() \
     _msg=() \
     _sight \
     _pic \
     _score=0 \
+  shift \
+    1
   _pics=(
     "$@"
   )
@@ -77,7 +80,26 @@ _proximity_score() {
     "${_score}"
 }
 
+_scan_tool_auto_detect() {
+  local \
+    _os \
+    scan_tool
+  _scan_tool="iw"
+  _os="$( \
+    uname \
+      -o)"
+  if [[ "${_os}" == "Android" ]]; then
+    _scan_tool="android"
+  fi
+  echo \
+    "${_scan_tool}-bssid-scan"
+}
+
 _set_overrides() {
+  _set_override \
+    "scan" \
+    "tool" \
+    "$(_scan_tool_auto_detect)"
   if [[ -v override_quiet ]]; then
     quiet="${override_quiet}"
   elif [[ -z "${quiet}" ]]; then
@@ -102,12 +124,14 @@ _usage() {
       -d '' \
       _usage_text << \
         ENDUSAGETEXT || true
-assumed vulnerable geofencer
+Proximity score obtained using a WiFi scan metric
 usage:
   $(_get "app" "name")
     [options]
     [area seed]
   options:
+     -m                   Wifi scan tool.
+                          Default: '$(_get "scan" "tool")'
      -h                   This message.
      -c                   Enable color output
      -v                   Enable verbose output
@@ -130,6 +154,7 @@ _show_config() {
       "${SOURCE_DATE_EPOCH}"
   _msg_info "${app_name} configuration"
   _msg_info "             Resolve date:   $(_get "_resolve" "date")"
+  _msg_info "                Scan tool:   $(_get "scan" "tool")"
   _msg_info "                Area seed:   $(_get "area" "seed")"
 }
 
@@ -139,10 +164,11 @@ _requirements
 # shellcheck disable=SC2034
 while \
   getopts \
-    'cvh?' \
+    'm:cvh?' \
     arg; do
   case \
     "${arg}" in
+    m) override_scan_tool="${OPTARG}" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -173,10 +199,13 @@ if [[ "${area_seed[*]}" == "" ]]; then
     1
 fi
 app_opts=(
+  "$(_get \
+       "scan" \
+       "tool")"
   "${area_seed[@]}"
 )
 _show_config
-_proximity_score \
+_wifi_proximity_score \
   "${app_opts[@]}"
 
 # vim:set sw=2 sts=-1 et:

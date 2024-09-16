@@ -14,6 +14,8 @@ source \
 
 # shellcheck disable=SC2034
 _global_variables() {
+  score_date=''
+  target_device=''
   area_seed=()
   color=""
   quiet=""
@@ -50,19 +52,19 @@ _sight_get() {
 # $@: area seed (sha256sums of area bssids)
 _wifi_proximity_score() {
   local \
-    _scan_tool="${1}" \
+    _device="${1}" \
     _pics=() \
     _bsss=() \
     _msg=() \
     _sight \
     _pic \
-    _score=0 \
+    _score=0
   shift \
     1
   _pics=(
     "$@"
   )
-  _bsss=( $( \
+  _bsss+=( $( \
     bssid-scan)
   )
   for _bssid in "${_bsss[@]}"; do
@@ -71,7 +73,9 @@ _wifi_proximity_score() {
         "${_bssid}")"
     for _pic in \
       "${_pics}"; do
-      if [[ "${_pic}" == "${_sight}" ]]; then
+      if [[ "${_pic}" == *"${_sight}"* ]]; then
+        _msg_info \
+          "found similarity between ${_bssid} and ${_pic}"
         _score="$((_score + 1))"
       fi
     done
@@ -80,26 +84,15 @@ _wifi_proximity_score() {
     "${_score}"
 }
 
-_scan_tool_auto_detect() {
-  local \
-    _os \
-    scan_tool
-  _scan_tool="iw"
-  _os="$( \
-    uname \
-      -o)"
-  if [[ "${_os}" == "Android" ]]; then
-    _scan_tool="android"
-  fi
-  echo \
-    "${_scan_tool}-bssid-scan"
-}
-
 _set_overrides() {
-  _set_override \
-    "scan" \
-    "tool" \
-    "$(_scan_tool_auto_detect)"
+  _set \
+    "score" \
+    "date" \
+    "$(_get_date_human)"
+  _set \
+    "target" \
+    "device" \
+    'wlan0'
   if [[ -v override_quiet ]]; then
     quiet="${override_quiet}"
   elif [[ -z "${quiet}" ]]; then
@@ -130,8 +123,8 @@ usage:
     [options]
     [area seed]
   options:
-     -m                   Wifi scan tool.
-                          Default: '$(_get "scan" "tool")'
+     -d                   Target wireless device.
+                          Default: '$(_get "target" "device")'
      -h                   This message.
      -c                   Enable color output
      -v                   Enable verbose output
@@ -145,16 +138,9 @@ ENDUSAGETEXT
 
 # Shows configuration options.
 _show_config() {
-  local \
-    _resolve_date
-  TZ=UTC \
-    printf \
-      -v _resolve_date \
-      '%(%FT%R%z)T' \
-      "${SOURCE_DATE_EPOCH}"
   _msg_info "${app_name} configuration"
-  _msg_info "             Resolve date:   $(_get "_resolve" "date")"
-  _msg_info "                Scan tool:   $(_get "scan" "tool")"
+  _msg_info "               Score date:   $(_get "score" "date")"
+  _msg_info "            Target device:   $(_get "target" "device")"
   _msg_info "                Area seed:   $(_get "area" "seed")"
 }
 
@@ -164,11 +150,11 @@ _requirements
 # shellcheck disable=SC2034
 while \
   getopts \
-    'm:cvh?' \
+    'd:cvh?' \
     arg; do
   case \
     "${arg}" in
-    m) override_scan_tool="${OPTARG}" ;;
+    d) override_target_device="${OPTARG}" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -200,8 +186,8 @@ if [[ "${area_seed[*]}" == "" ]]; then
 fi
 app_opts=(
   "$(_get \
-       "scan" \
-       "tool")"
+       "target" \
+       "device")"
   "${area_seed[@]}"
 )
 _show_config
